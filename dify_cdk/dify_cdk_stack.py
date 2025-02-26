@@ -3,13 +3,41 @@ from aws_cdk import (
     aws_ec2 as ec2,
     aws_iam as iam,
     CfnOutput,
+    CfnParameter,
 )
 from constructs import Construct
+import os
+import json
 
 class DifyCdkStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # 環境変数から複数のIPアドレスを取得
+        allowed_ips_str = os.environ.get('ALLOWED_IPS', '')
+        
+        # 環境変数が設定されていない場合はCloudFormationパラメータを使用
+        if not allowed_ips_str:
+            allowed_ips_param = CfnParameter(
+                self, "AllowedIPs",
+                type="String",
+                description="Comma-separated list of IP addresses with CIDR notation (e.g., 123.123.123.123/32,124.124.124.124/32)",
+                default="0.0.0.0/0"  # デフォルトは全開放（本番環境では避けるべき）
+            )
+            allowed_ips_str = allowed_ips_param.value_as_string
+        
+        # カンマ区切りの文字列をリストに変換
+        allowed_ips = [ip.strip() for ip in allowed_ips_str.split(',') if ip.strip()]
+        
+        # CIDRブロック形式になっていない場合は追加
+        for i, ip in enumerate(allowed_ips):
+            if '/' not in ip:
+                allowed_ips[i] = f"{ip}/32"
+        
+        # IPが指定されていない場合は全開放
+        if not allowed_ips:
+            allowed_ips = ["0.0.0.0/0"]
 
         # VPCの作成
         vpc = ec2.Vpc(
@@ -30,15 +58,24 @@ class DifyCdkStack(Stack):
         security_group = ec2.SecurityGroup(
             self, "DifySecurityGroup",
             vpc=vpc,
-            description="Allow HTTP traffic",
+            description="Allow HTTP traffic from specific IPs",
             allow_all_outbound=True
         )
 
-        security_group.add_ingress_rule(
-            peer=ec2.Peer.any_ipv4(),
-            connection=ec2.Port.tcp(80),
-            description="Allow HTTP traffic from allowed CIDR"
-        )
+        # 複数のIPからのHTTPアクセスを許可
+        for i, ip in enumerate(allowed_ips):
+            security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(ip),
+                connection=ec2.Port.tcp(80),
+                description=f"Allow HTTP traffic from {ip}"
+            )
+            
+            # SSHアクセスも同じIPからのみ許可（必要な場合）
+            security_group.add_ingress_rule(
+                peer=ec2.Peer.ipv4(ip),
+                connection=ec2.Port.tcp(22),
+                description=f"Allow SSH traffic from {ip}"
+            )
 
         # IAMロールの作成
         role = iam.Role(
