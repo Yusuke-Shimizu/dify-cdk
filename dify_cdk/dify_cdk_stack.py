@@ -69,13 +69,6 @@ class DifyCdkStack(Stack):
                 connection=ec2.Port.tcp(80),
                 description=f"Allow HTTP traffic from {ip}"
             )
-            
-            # SSHアクセスも同じIPからのみ許可（必要な場合）
-            security_group.add_ingress_rule(
-                peer=ec2.Peer.ipv4(ip),
-                connection=ec2.Port.tcp(22),
-                description=f"Allow SSH traffic from {ip}"
-            )
 
         # IAMロールの作成
         role = iam.Role(

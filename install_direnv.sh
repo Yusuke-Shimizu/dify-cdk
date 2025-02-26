@@ -1,23 +1,41 @@
 #!/bin/bash
-# direnvのインストール方法（Ubuntu/Debian）
-# sudo apt-get update
-# sudo apt-get install -y direnv
 
-# direnvのインストール方法（Amazon Linux 2023）
-sudo dnf install -y direnv
+# Homebrewのインストールに必要なパッケージをインストール
+sudo dnf install -y git curl file procps
 
-# direnvのインストール方法（macOS）
-# brew install direnv
+# Homebrewをインストール
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# シェル設定ファイルに direnv hook を追加
+# Homebrewの環境変数を設定
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+
+# Homebrewの動作確認
+brew doctor
+
+# direnvのインストール
+brew install direnv
+
+# direnvの設定をシェルに追加
 echo 'eval "$(direnv hook bash)"' >> ~/.bashrc
-# ZSHを使用している場合
-# echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
 
 # 設定を反映
 source ~/.bashrc
-# または
-# source ~/.zshrc
+
+# .envrcファイルがなければサンプルからコピー
+if [ ! -f .envrc ]; then
+  if [ -f .envrc.example ]; then
+    cp .envrc.example .envrc
+    echo "Created .envrc from example file. Please edit it with your actual IP addresses."
+  else
+    echo 'export ALLOWED_IPS="0.0.0.0/0"' > .envrc
+    echo "Created default .envrc file. Please edit it with your actual IP addresses."
+  fi
+fi
 
 # .envrcファイルを許可
-direnv allow . 
+direnv allow .
+
+echo "Homebrew and direnv installation complete."
+echo "Please restart your shell or run 'source ~/.bashrc' to apply changes."
+echo "Edit .envrc file to set your allowed IP addresses." 
